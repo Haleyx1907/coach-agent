@@ -360,8 +360,8 @@ async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
 # --- CONFIG TEMPORAIRE DE TEST : à remettre à (6,) / 18h00 après validation ---
 job = app.job_queue.run_daily(
     envoyer_bilan_dimanche,
-    time=datetime.time(hour=10, minute=25),  # UTC (pas de tzinfo = UTC par défaut pour PTB)
-    days=(4,)  # TEST : 4 = vendredi. Remettre (6,) pour dimanche une fois validé.
+    time=datetime.time(hour=10, minute=35)  # UTC (pas de tzinfo = UTC par défaut pour PTB)
+    # TEST : contrainte de jour retirée temporairement pour isoler le bug "Enabled: False"
 )
 print("[DEBUG] Job programmé (heure UTC, sans tzinfo)")
 
