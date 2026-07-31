@@ -1,0 +1,14 @@
+services:
+  coach-agent:
+    build: .
+    container_name: coach-agent
+    restart: unless-stopped
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      HEVY_API_KEY: ${HEVY_API_KEY}
+    volumes:
+      - coach_data:/app/data
+
+volumes:
+  coach_data:
