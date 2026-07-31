@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from anthropic import Anthropic
 from telegram import Update
-from telegram.ext import Application, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler
 import os
 import json
 import requests
@@ -304,7 +304,19 @@ async def repondre(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i in range(0, len(reponse_claude), LIMITE_TELEGRAM):
         await update.message.reply_text(reponse_claude[i:i + LIMITE_TELEGRAM])
 
+async def commande_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Commande de debug : liste les tâches planifiées et leur configuration réelle."""
+    jobs = context.job_queue.jobs()
+    if not jobs:
+        await update.message.reply_text("Aucun job programmé trouvé.")
+        return
+    lignes = []
+    for j in jobs:
+        lignes.append(f"Nom: {j.name}\nTrigger: {j.job.trigger}\nEnabled: {j.enabled}")
+    await update.message.reply_text("\n\n".join(lignes))
+
 app = Application.builder().token(TELEGRAM_TOKEN).build()
+app.add_handler(CommandHandler("jobs", commande_jobs))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, repondre))
 
 # ---------- Bilan automatique du dimanche ----------
@@ -348,7 +360,7 @@ async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
 # --- CONFIG TEMPORAIRE DE TEST : à remettre à (6,) / 18h00 après validation ---
 job = app.job_queue.run_daily(
     envoyer_bilan_dimanche,
-    time=datetime.time(hour=10, minute=5),  # UTC (pas de tzinfo = UTC par défaut pour PTB)
+    time=datetime.time(hour=10, minute=25),  # UTC (pas de tzinfo = UTC par défaut pour PTB)
     days=(4,)  # TEST : 4 = vendredi. Remettre (6,) pour dimanche une fois validé.
 )
 print("[DEBUG] Job programmé (heure UTC, sans tzinfo)")
