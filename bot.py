@@ -224,6 +224,35 @@ def executer_outil(nom_outil, entree):
 
 # ---------- Boucle agent ----------
 
+def tronquer_historique_proprement(historique, max_messages):
+    """
+    Tronque l'historique en gardant les derniers messages, mais sans jamais couper
+    au milieu d'un échange tool_use/tool_result (ce qui rendrait l'historique invalide
+    pour l'API Claude).
+    """
+    if len(historique) <= max_messages:
+        return historique
+
+    tronque = historique[-max_messages:]
+
+    # Si le premier message restant est un tool_result "orphelin" (sans le tool_use
+    # correspondant juste avant, qui a été coupé), on avance jusqu'à un point sûr :
+    # un message dont le contenu est du texte simple, pas un tool_result.
+    while tronque:
+        premier = tronque[0]
+        contenu = premier.get("content")
+        est_tool_result_orphelin = (
+            isinstance(contenu, list)
+            and len(contenu) > 0
+            and isinstance(contenu[0], dict)
+            and contenu[0].get("type") == "tool_result"
+        )
+        if not est_tool_result_orphelin:
+            break
+        tronque = tronque[1:]
+
+    return tronque
+
 def demander_a_claude(historique):
     """
     Envoie l'historique à Claude, et gère la boucle d'appel d'outils :
@@ -265,11 +294,17 @@ def demander_a_claude(historique):
 
         historique.append({"role": "assistant", "content": contenu_serialisable})
 
-        # ...puis on exécute chaque outil demandé et on prépare les résultats
+        # ...puis on exécute chaque outil demandé et on prépare les résultats.
+        # On capture toute exception pour TOUJOURS renvoyer un tool_result
+        # (même en cas d'erreur), afin de ne jamais laisser un tool_use sans réponse
+        # dans l'historique, ce qui casserait les appels suivants à l'API.
         resultats_outils = []
         for bloc in response.content:
             if bloc.type == "tool_use":
-                resultat = executer_outil(bloc.name, bloc.input)
+                try:
+                    resultat = executer_outil(bloc.name, bloc.input)
+                except Exception as e:
+                    resultat = f"Erreur lors de l'exécution de l'outil : {e}"
                 resultats_outils.append({
                     "type": "tool_result",
                     "tool_use_id": bloc.id,
@@ -302,11 +337,10 @@ async def repondre(update: Update, context: ContextTypes.DEFAULT_TYPE):
     historique.append({"role": "assistant", "content": reponse_claude})
 
     if len(historique) > MAX_MESSAGES:
-        historique_conversations[chat_id] = historique[-MAX_MESSAGES:]
+        historique_conversations[chat_id] = tronquer_historique_proprement(historique, MAX_MESSAGES)
 
     sauvegarder_historique(historique_conversations)
 
-    # Telegram limite chaque message à 4096 caractères : on découpe si besoin
     LIMITE_TELEGRAM = 4096
     for i in range(0, len(reponse_claude), LIMITE_TELEGRAM):
         await update.message.reply_text(reponse_claude[i:i + LIMITE_TELEGRAM])
@@ -367,7 +401,7 @@ async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
         historique.append({"role": "assistant", "content": reponse_claude})
 
         if len(historique) > MAX_MESSAGES:
-            historique_conversations[chat_id] = historique[-MAX_MESSAGES:]
+            historique_conversations[chat_id] = tronquer_historique_proprement(historique, MAX_MESSAGES)
 
         sauvegarder_historique(historique_conversations)
 
