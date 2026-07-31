@@ -341,10 +341,11 @@ async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=int(chat_id), text=reponse_claude[i:i + LIMITE_TELEGRAM])
 
 # Planifie le bilan tous les dimanches à 18h00, heure de Paris
+# --- CONFIG TEMPORAIRE DE TEST : vendredi 11h13, à remettre à (6,) / 18h00 après validation ---
 app.job_queue.run_daily(
     envoyer_bilan_dimanche,
-    time=datetime.time(hour=18, minute=0, tzinfo=ZoneInfo("Europe/Paris")),
-    days=(6,)  # 6 = dimanche (0 = lundi ... 6 = dimanche)
+    time=datetime.time(hour=11, minute=13, tzinfo=ZoneInfo("Europe/Paris")),
+    days=(4,)  # TEST : 4 = vendredi. Remettre (6,) pour dimanche une fois validé.
 )
 
 print("Bot démarré, va sur Telegram pour lui parler...")
