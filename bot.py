@@ -348,7 +348,7 @@ async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
 # --- CONFIG TEMPORAIRE DE TEST : à remettre à (6,) / 18h00 après validation ---
 job = app.job_queue.run_daily(
     envoyer_bilan_dimanche,
-    time=datetime.time(hour=11, minute=40, tzinfo=ZoneInfo("Europe/Paris")),
+    time=datetime.time(hour=11, minute=53, tzinfo=ZoneInfo("Europe/Paris")),
     days=(4,)  # TEST : 4 = vendredi. Remettre (6,) pour dimanche une fois validé.
 )
 
