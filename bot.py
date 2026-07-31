@@ -319,16 +319,20 @@ PROMPT_BILAN = (
 
 async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
     """Envoie un bilan hebdomadaire automatique à chaque utilisateur connu du bot."""
+    print(f"[DEBUG] Déclenchement du bilan. Utilisateurs connus : {list(historique_conversations.keys())}")
+
     for chat_id in list(historique_conversations.keys()):
+        print(f"[DEBUG] Génération du bilan pour {chat_id}...")
         historique = historique_conversations[chat_id]
         historique.append({"role": "user", "content": PROMPT_BILAN})
 
         try:
             reponse_claude = demander_a_claude(historique)
         except Exception as e:
-            print(f"Erreur lors du bilan automatique pour {chat_id} : {e}")
+            print(f"[DEBUG] Erreur lors du bilan automatique pour {chat_id} : {e}")
             continue
 
+        print(f"[DEBUG] Bilan généré pour {chat_id}, envoi en cours...")
         historique.append({"role": "assistant", "content": reponse_claude})
 
         if len(historique) > MAX_MESSAGES:
@@ -344,7 +348,7 @@ async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
 # --- CONFIG TEMPORAIRE DE TEST : à remettre à (6,) / 18h00 après validation ---
 job = app.job_queue.run_daily(
     envoyer_bilan_dimanche,
-    time=datetime.time(hour=11, minute=27, tzinfo=ZoneInfo("Europe/Paris")),
+    time=datetime.time(hour=11, minute=40, tzinfo=ZoneInfo("Europe/Paris")),
     days=(4,)  # TEST : 4 = vendredi. Remettre (6,) pour dimanche une fois validé.
 )
 
