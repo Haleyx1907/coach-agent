@@ -306,13 +306,14 @@ async def repondre(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def commande_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Commande de debug : liste les tâches planifiées et leur configuration réelle."""
+    scheduler_running = context.job_queue.scheduler.running
     jobs = context.job_queue.jobs()
+    lignes = [f"Scheduler running: {scheduler_running}"]
     if not jobs:
-        await update.message.reply_text("Aucun job programmé trouvé.")
-        return
-    lignes = []
-    for j in jobs:
-        lignes.append(f"Nom: {j.name}\nTrigger: {j.job.trigger}\nEnabled: {j.enabled}")
+        lignes.append("Aucun job programmé trouvé.")
+    else:
+        for j in jobs:
+            lignes.append(f"Nom: {j.name}\nTrigger: {j.job.trigger}\nEnabled: {j.enabled}\nnext_run_time: {j.job.next_run_time}")
     await update.message.reply_text("\n\n".join(lignes))
 
 app = Application.builder().token(TELEGRAM_TOKEN).build()
