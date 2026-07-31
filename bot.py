@@ -348,9 +348,10 @@ async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
 # --- CONFIG TEMPORAIRE DE TEST : à remettre à (6,) / 18h00 après validation ---
 job = app.job_queue.run_daily(
     envoyer_bilan_dimanche,
-    time=datetime.time(hour=11, minute=53, tzinfo=ZoneInfo("Europe/Paris")),
+    time=datetime.time(hour=10, minute=5),  # UTC (pas de tzinfo = UTC par défaut pour PTB)
     days=(4,)  # TEST : 4 = vendredi. Remettre (6,) pour dimanche une fois validé.
 )
+print("[DEBUG] Job programmé (heure UTC, sans tzinfo)")
 
 print("Bot démarré, va sur Telegram pour lui parler...")
 app.run_polling()
