@@ -5,6 +5,8 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes
 import os
 import json
 import requests
+import datetime
+from zoneinfo import ZoneInfo
 
 load_dotenv()
 
@@ -304,6 +306,46 @@ async def repondre(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 app = Application.builder().token(TELEGRAM_TOKEN).build()
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, repondre))
+
+# ---------- Bilan automatique du dimanche ----------
+
+PROMPT_BILAN = (
+    "C'est le bilan hebdomadaire du dimanche. Analyse mes séances de la semaine "
+    "écoulée (utilise tes outils pour aller chercher mes vraies données Hevy et "
+    "calculer mon volume par groupe musculaire sur 1 semaine). Donne-moi un résumé "
+    "clair : ce qui a été fait, les points forts, et 1-2 axes d'amélioration concrets "
+    "pour la semaine prochaine. Reste synthétique."
+)
+
+async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
+    """Envoie un bilan hebdomadaire automatique à chaque utilisateur connu du bot."""
+    for chat_id in list(historique_conversations.keys()):
+        historique = historique_conversations[chat_id]
+        historique.append({"role": "user", "content": PROMPT_BILAN})
+
+        try:
+            reponse_claude = demander_a_claude(historique)
+        except Exception as e:
+            print(f"Erreur lors du bilan automatique pour {chat_id} : {e}")
+            continue
+
+        historique.append({"role": "assistant", "content": reponse_claude})
+
+        if len(historique) > MAX_MESSAGES:
+            historique_conversations[chat_id] = historique[-MAX_MESSAGES:]
+
+        sauvegarder_historique(historique_conversations)
+
+        LIMITE_TELEGRAM = 4096
+        for i in range(0, len(reponse_claude), LIMITE_TELEGRAM):
+            await context.bot.send_message(chat_id=int(chat_id), text=reponse_claude[i:i + LIMITE_TELEGRAM])
+
+# Planifie le bilan tous les dimanches à 18h00, heure de Paris
+app.job_queue.run_daily(
+    envoyer_bilan_dimanche,
+    time=datetime.time(hour=18, minute=0, tzinfo=ZoneInfo("Europe/Paris")),
+    days=(6,)  # 6 = dimanche (0 = lundi ... 6 = dimanche)
+)
 
 print("Bot démarré, va sur Telegram pour lui parler...")
 app.run_polling()
