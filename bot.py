@@ -14,6 +14,7 @@ load_dotenv()
 claude = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 HEVY_API_KEY = os.getenv("HEVY_API_KEY")
+AUTHORIZED_CHAT_ID = os.getenv("AUTHORIZED_CHAT_ID")  # ton chat_id personnel, seul autorisé à utiliser le bot
 
 SYSTEM_PROMPT = """Tu es un coach sportif personnel, spécialisé en musculation et progression en salle. Tu réponds toujours en français.
 
@@ -282,6 +283,12 @@ def demander_a_claude(historique):
 
 async def repondre(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.message.chat_id)
+
+    # Sécurité : seul le chat_id autorisé peut utiliser le bot
+    if AUTHORIZED_CHAT_ID and chat_id != AUTHORIZED_CHAT_ID:
+        print(f"[SECURITE] Message refusé, chat_id non autorisé : {chat_id}")
+        return
+
     message_utilisateur = update.message.text
 
     if chat_id not in historique_conversations:
@@ -306,6 +313,9 @@ async def repondre(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def commande_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Commande de debug : liste les tâches planifiées et leur configuration réelle."""
+    chat_id = str(update.message.chat_id)
+    if AUTHORIZED_CHAT_ID and chat_id != AUTHORIZED_CHAT_ID:
+        return
     scheduler_running = context.job_queue.scheduler.running
     jobs = context.job_queue.jobs()
     lignes = [f"Scheduler running: {scheduler_running}"]
@@ -316,7 +326,12 @@ async def commande_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lignes.append(f"Nom: {j.name}\nTrigger: {j.job.trigger}\nEnabled: {j.enabled}\nnext_run_time: {j.job.next_run_time}")
     await update.message.reply_text("\n\n".join(lignes))
 
+async def commande_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Commande utilitaire : affiche le chat_id de l'utilisateur (pour configurer la restriction d'accès)."""
+    await update.message.reply_text(f"Ton chat_id est : {update.message.chat_id}")
+
 app = Application.builder().token(TELEGRAM_TOKEN).build()
+app.add_handler(CommandHandler("whoami", commande_whoami))
 app.add_handler(CommandHandler("jobs", commande_jobs))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, repondre))
 
@@ -331,10 +346,13 @@ PROMPT_BILAN = (
 )
 
 async def envoyer_bilan_dimanche(context: ContextTypes.DEFAULT_TYPE):
-    """Envoie un bilan hebdomadaire automatique à chaque utilisateur connu du bot."""
-    print(f"[DEBUG] Déclenchement du bilan. Utilisateurs connus : {list(historique_conversations.keys())}")
+    """Envoie un bilan hebdomadaire automatique, uniquement au chat_id autorisé."""
+    chat_ids_cibles = [AUTHORIZED_CHAT_ID] if AUTHORIZED_CHAT_ID else list(historique_conversations.keys())
+    print(f"[DEBUG] Déclenchement du bilan. Destinataire(s) : {chat_ids_cibles}")
 
-    for chat_id in list(historique_conversations.keys()):
+    for chat_id in chat_ids_cibles:
+        if chat_id not in historique_conversations:
+            historique_conversations[chat_id] = []
         print(f"[DEBUG] Génération du bilan pour {chat_id}...")
         historique = historique_conversations[chat_id]
         historique.append({"role": "user", "content": PROMPT_BILAN})
